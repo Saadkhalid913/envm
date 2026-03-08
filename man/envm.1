@@ -1,0 +1,258 @@
+.TH ENVM 1 "March 2026" "envm 0.1.0" "User Commands"
+.SH NAME
+envm \- CLI tool for managing .env files
+.SH SYNOPSIS
+.B envm
+.RI [ command ]
+.RI [ options ]
+.SH DESCRIPTION
+.B envm
+(env manager) is a CLI tool for managing
+.B .env
+files within a project. It provides set\-theoretic comparison, flexible merge strategies, named snapshots, validation, and template generation.
+.PP
+envm is project\-scoped \(em it operates on
+.B .env*
+files in the current working directory. A
+.B .envm/
+directory stores project\-level configuration, snapshots, and schema.
+.SH COMMANDS
+.TP
+.B init \fR[\fB\-\-schema\fR]
+Initialize envm in the current project. Creates the
+.B .envm/
+directory with a default config. Use
+.B \-\-schema
+to auto\-generate a validation schema from existing env files.
+.TP
+.B list\fR, \fBls
+List all
+.B .env*
+files in the current directory with their variable counts.
+.TP
+.B get \fIkey \fR[\fB\-\-file \fIpath\fR]
+Get the value of a key from an env file. Defaults to
+.BR .env .
+.TP
+.B set \fIKEY=VALUE \fR[\fB\-\-file \fIpath\fR]
+Set a key\-value pair in an env file. Creates the file if it doesn't exist.
+.TP
+.B unset \fIkey \fR[\fB\-\-file \fIpath\fR]
+Remove a key from an env file. The
+.B \-\-file
+flag supports glob patterns like
+.BR .env.* .
+.TP
+.B diff\fR, \fBcompare \fIfiles... \fR[\fIoptions\fR]
+Compare two or more env files using set operations. This is the flagship feature.
+.RS
+.TP
+.B \-\-only \fIfilter
+Set operation filter. One of:
+.BR union " (default),"
+.BR intersection ,
+.BR diff ,
+.BR xor ,
+or a file label
+.RB ( a ", " b ", " "a,b" ).
+.TP
+.B \-\-format \fItype
+Output format:
+.B table
+(default) or
+.BR json .
+.RE
+.TP
+.B merge \fIfiles... \fR[\fIoptions\fR]
+Merge two or more env files into a single output.
+.RS
+.TP
+.B \-o\fR, \fB\-\-output \fIfile
+Output file path (required unless
+.B \-\-stdout
+is used).
+.TP
+.B \-\-stdout
+Write merged output to stdout.
+.TP
+.B \-\-strategy \fIname
+Merge strategy:
+.BR union " (default),"
+.BR intersection ,
+.BR a .
+.TP
+.B \-\-dry\-run
+Show what would be written without writing.
+.RE
+.TP
+.B clone\fR, \fBcp \fIsource dest \fR[\fIoptions\fR]
+Duplicate an env file, optionally modifying keys.
+.RS
+.TP
+.B \-\-set \fIKEY=VALUE
+Override or add a key. Repeatable.
+.TP
+.B \-\-unset \fIKEY
+Remove a key. Repeatable, comma\-separated.
+.RE
+.TP
+.B template \fIfile \fR[\fIoptions\fR]
+Generate a
+.B .env.example
+or template from a real env file.
+.RS
+.TP
+.B \-o\fR, \fB\-\-output \fIfile
+Output file path. Defaults to stdout.
+.TP
+.B \-\-placeholder
+Generate placeholder hints based on key names and value patterns.
+.TP
+.B \-\-keep\-defaults
+Preserve non\-sensitive values (booleans, ports, localhost).
+.RE
+.TP
+.B validate \fIfiles... \fR[\fIoptions\fR]
+Validate env files against a schema.
+.RS
+.TP
+.B \-\-schema \fIpath
+Path to schema file. Default:
+.BR .envm/schema.json .
+.TP
+.B \-\-strict
+Treat keys not defined in the schema as errors.
+.TP
+.B \-\-format \fItype
+Output format:
+.B text
+(default) or
+.BR json .
+.RE
+.TP
+.B schema generate \fIfiles...
+Infer a validation schema from existing env files. Writes to
+.BR .envm/schema.json .
+.TP
+.B snapshot\fR, \fBsnap \fIsubcommand
+Manage named snapshots of env file state.
+.RS
+.TP
+.B save \fIname \fR[\fIfiles...\fR]
+Save a snapshot. Defaults to all
+.B .env*
+files.
+.TP
+.B list
+List all saved snapshots.
+.TP
+.B show \fIname
+Display the contents of a snapshot.
+.TP
+.B restore \fIname \fR[\fB\-\-file \fIname\fR] [\fB\-\-dry\-run\fR]
+Restore files from a snapshot.
+.TP
+.B delete \fIname
+Delete a snapshot.
+.RE
+.TP
+.B sort \fIfile \fR[\fB\-o \fIfile\fR]
+Sort an env file alphabetically. Overwrites in place unless
+.B \-o
+is specified.
+.TP
+.B normalize \fIfile
+Output a normalized version of an env file to stdout. Sorts keys, strips comments and whitespace, applies consistent quoting. Does not modify the original file.
+.SH GLOBAL OPTIONS
+.TP
+.B \-V\fR, \fB\-\-version
+Output the version number.
+.TP
+.B \-h\fR, \fB\-\-help
+Display help for a command.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Validation errors or command failure.
+.SH FILES
+.TP
+.B .envm/config.json
+Project\-level configuration.
+.TP
+.B .envm/schema.json
+Validation schema for env files.
+.TP
+.B .envm/snapshots/
+Directory containing named snapshots as JSON files.
+.SH EXAMPLES
+List all env files:
+.PP
+.RS
+.nf
+$ envm ls
+.fi
+.RE
+.PP
+Compare staging and production:
+.PP
+.RS
+.nf
+$ envm diff .env.staging .env.production
+.fi
+.RE
+.PP
+Show only keys that differ:
+.PP
+.RS
+.nf
+$ envm diff .env.staging .env.production \-\-only diff
+.fi
+.RE
+.PP
+Merge with production values winning:
+.PP
+.RS
+.nf
+$ envm merge .env.staging .env.production \-o .env.merged
+.fi
+.RE
+.PP
+Clone production for local dev with overrides:
+.PP
+.RS
+.nf
+$ envm clone .env.production .env.local \-\-set "DEBUG=true" \-\-set "PORT=3001"
+.fi
+.RE
+.PP
+Generate a template with placeholders:
+.PP
+.RS
+.nf
+$ envm template .env.production \-\-placeholder \-o .env.example
+.fi
+.RE
+.PP
+Normalize a messy env file:
+.PP
+.RS
+.nf
+$ envm normalize .env.messy
+.fi
+.RE
+.PP
+Save and restore a snapshot:
+.PP
+.RS
+.nf
+$ envm snapshot save "before\-migration"
+$ envm snapshot restore "before\-migration" \-\-dry\-run
+.fi
+.RE
+.SH BUGS
+Report bugs at https://github.com/saadkhalid/envm/issues
+.SH AUTHOR
+Saad Khalid
