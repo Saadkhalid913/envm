@@ -133,7 +133,7 @@ fi
 
 # --- Dependencies ---
 
-if run_with_spinner "Installing dependencies..." bash -c "cd '$INSTALL_DIR' && npm install --omit=dev"; then
+if run_with_spinner "Installing dependencies..." bash -c "cd '$INSTALL_DIR' && npm install"; then
   ok "Dependencies installed"
 else
   fail "npm install failed"
@@ -153,6 +153,14 @@ else
   dim "Try running manually:"
   dim "  cd $INSTALL_DIR && npm run build"
   exit 1
+fi
+
+# --- Prune dev dependencies ---
+
+if run_with_spinner "Cleaning up..." bash -c "cd '$INSTALL_DIR' && npm prune --omit=dev"; then
+  ok "Dev dependencies removed"
+else
+  warning "Could not prune dev dependencies (non-critical)"
 fi
 
 # --- Link binary ---
