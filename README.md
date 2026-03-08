@@ -1,28 +1,21 @@
 # envm
 
-CLI tool for managing `.env` files — compare, merge, snapshot, validate.
+A fast CLI for managing `.env` files. Compare environments with set operations, merge with conflict strategies, snapshot state, validate against schemas, and more.
 
 ## Install
-
-### npm
-
-```bash
-npm install -g envm
-```
-
-Or run without installing:
-
-```bash
-npx envm
-```
-
-### Shell script (macOS / Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Saadkhalid913/envm/main/install.sh | bash
 ```
 
-Or manually:
+Or with npm:
+
+```bash
+npm install -g envm
+```
+
+<details>
+<summary>Manual install</summary>
 
 ```bash
 git clone https://github.com/Saadkhalid913/envm.git ~/.envm
@@ -30,94 +23,49 @@ cd ~/.envm && npm install && npm run build
 sudo ln -sf ~/.envm/dist/cli/index.js /usr/local/bin/envm
 ```
 
-See [install.sh](./install.sh) for details.
+</details>
 
 ## Quick Start
 
 ```bash
-# Initialize envm in your project
-envm init
-
-# List all env files
-envm ls
-
-# Compare staging vs production
-envm diff .env.staging .env.production
-
-# See only the differences
-envm diff .env.staging .env.production --only diff
-
-# Merge files (production values win)
-envm merge .env.staging .env.production -o .env.merged
-
-# Clone with overrides
-envm clone .env.production .env.local --set "DEBUG=true" --set "PORT=3001"
-
-# Normalize a messy env file
-envm normalize .env.messy
-
-# Save a snapshot before making changes
-envm snapshot save "before-migration"
+envm init                                          # set up envm in your project
+envm ls                                            # list all .env files
+envm diff .env.staging .env.production             # compare two files
+envm diff .env.*                                   # compare all env files at once
+envm merge .env.staging .env.production -o .env    # merge with last-wins
+envm clone .env .env.local --set "DEBUG=true"      # clone with overrides
+envm snapshot save "before-migration"              # save a named snapshot
+envm validate .env.production                      # validate against schema
 ```
 
 ## Commands
 
-### `envm init`
-
-Initialize envm in the current project. Creates a `.envm/` directory.
-
-```bash
-envm init
-envm init --schema    # also generate a schema from existing env files
-```
-
-### `envm list` / `envm ls`
-
-List all `.env*` files with their variable counts.
-
-```
-  .env              10 vars
-  .env.local        11 vars
-  .env.production   14 vars
-```
-
-### `envm get` / `envm set` / `envm unset`
-
-Quick key-level operations.
-
-```bash
-envm get DATABASE_URL
-envm get DATABASE_URL --file .env.production
-envm set PORT=8080 --file .env.staging
-envm unset DEBUG
-envm unset DEBUG --file .env.*    # remove from all matching files
-```
-
 ### `envm diff` / `envm compare`
 
-Compare two or more env files using set operations.
+Compare two or more env files side-by-side. Supports glob patterns and color-codes values so you can instantly see which environments share the same value for each key.
 
 ```bash
-envm diff .env.staging .env.production
-envm diff .env .env.local .env.production    # 3-way compare
+envm diff .env.dev .env.production
+envm diff .env.*                          # glob — compare all env files
+envm diff .env.prod.*                     # glob — compare all prod variants
+envm diff .env .env.local .env.staging    # 3-way compare
 ```
 
-**Set operation filters** with `--only`:
+Values that match across files are shown in the same color per row, making it easy to spot which environments diverge.
 
-| Filter | Description |
-|--------|-------------|
+**Filters** — show only the keys you care about with `--only`:
+
+| Filter | Shows |
+|--------|-------|
 | `union` | All keys across all files (default) |
 | `intersection` | Keys present in every file |
-| `diff` | Keys that differ (missing or different value) |
-| `xor` | Keys in exactly one file (symmetric difference) |
-| `a`, `b` | Keys only in that file |
-| `a,b` | Keys in A and B but not others |
-
-**Output formats:**
+| `diff` | Keys that differ or are missing |
+| `xor` | Keys in exactly one file |
+| `a`, `b`, ... | Keys exclusive to that file |
 
 ```bash
-envm diff .env.a .env.b --format table    # colored table (default)
-envm diff .env.a .env.b --format json     # machine-readable JSON
+envm diff .env.staging .env.production --only diff
+envm diff .env.a .env.b --format json     # machine-readable output
 ```
 
 ### `envm merge`
@@ -125,97 +73,130 @@ envm diff .env.a .env.b --format json     # machine-readable JSON
 Merge two or more env files. Last file has highest precedence.
 
 ```bash
-envm merge .env.a .env.b -o .env.merged
+envm merge .env.defaults .env.local -o .env
 envm merge .env.a .env.b --stdout
-envm merge .env.a .env.b --strategy intersection -o .env.merged
 envm merge .env.a .env.b --dry-run -o .env.merged
 ```
 
-**Strategies:**
+**Strategies** via `--strategy`:
 
 | Strategy | Behavior |
 |----------|----------|
 | `union` | All keys, last file wins on conflict (default) |
-| `intersection` | Only keys in all files, last file wins on value |
+| `intersection` | Only keys common to all files |
 | `a` | Only keys from the first file |
 
 ### `envm clone` / `envm cp`
 
-Duplicate an env file with optional modifications.
+Duplicate an env file with optional inline overrides.
 
 ```bash
 envm clone .env.production .env.local
-envm clone .env.production .env.local --set "DEBUG=true" --set "LOG_LEVEL=debug"
+envm clone .env.production .env.local --set "DEBUG=true" --set "PORT=3001"
 envm clone .env.production .env.local --unset "API_SECRET,STRIPE_KEY"
 ```
 
-### `envm template`
+### `envm get` / `envm set` / `envm unset`
 
-Generate a `.env.example` from a real env file.
-
-```bash
-envm template .env.production                          # keys only, to stdout
-envm template .env.production -o .env.example          # write to file
-envm template .env.production --placeholder            # smart placeholders
-envm template .env.production --keep-defaults          # keep non-sensitive values
-```
-
-### `envm normalize`
-
-Output a normalized version of an env file. Sorts keys alphabetically, strips all comments and whitespace, applies consistent quoting. Writes to stdout only — never modifies the original file.
+Quick key-level read/write operations.
 
 ```bash
-envm normalize .env.messy
-envm normalize .env.messy > .env.clean    # redirect to a new file
-```
-
-### `envm sort`
-
-Sort an env file alphabetically (in-place normalization).
-
-```bash
-envm sort .env.production
-envm sort .env.production -o .env.sorted
+envm get DATABASE_URL
+envm get DATABASE_URL --file .env.production
+envm set PORT=8080 --file .env.staging
+envm unset DEBUG
 ```
 
 ### `envm validate`
 
-Validate env files against a schema.
+Validate env files against a JSON schema. Exit code `1` on errors — useful as a CI gate.
 
 ```bash
 envm validate .env.production
 envm validate .env.production --schema custom-schema.json
 envm validate .env.production --strict       # unknown keys are errors
-envm validate .env.production --format json  # for CI pipelines
+envm validate .env.production --format json  # machine-readable output
 ```
-
-Exit code `1` on validation errors — useful as a CI gate.
 
 ### `envm schema generate`
 
-Infer a validation schema from existing env files.
+Infer a validation schema from existing env files. Detects types (string, number, boolean, url, email) and constraints automatically.
 
 ```bash
 envm schema generate .env.production
 envm schema generate .env.production .env.staging    # union of rules
 ```
 
-### `envm snapshot` / `envm snap`
+### `envm template`
 
-Named snapshots of env file state.
+Generate a `.env.example` from a real env file — strips sensitive values.
 
 ```bash
-envm snapshot save "before-migration"              # snapshot all .env* files
-envm snapshot save "prod-backup" .env.production   # snapshot specific file
+envm template .env.production -o .env.example
+envm template .env.production --placeholder          # smart placeholders
+envm template .env.production --keep-defaults         # keep non-sensitive values
+```
+
+### `envm snapshot` / `envm snap`
+
+Named snapshots of env file state. Save before risky changes, restore if things go wrong.
+
+```bash
+envm snapshot save "before-migration"
+envm snapshot save "prod-backup" .env.production
 envm snapshot list
 envm snapshot show "before-migration"
 envm snapshot restore "before-migration"
 envm snapshot restore "before-migration" --dry-run
-envm snapshot restore "before-migration" --file .env.production
 envm snapshot delete "before-migration"
 ```
 
+### `envm normalize`
+
+Output a clean, normalized version of an env file to stdout. Sorts keys, strips comments and whitespace, applies consistent quoting. Never modifies the original.
+
+```bash
+envm normalize .env.messy
+envm normalize .env.messy > .env.clean
+```
+
+### `envm sort`
+
+Sort an env file alphabetically (in-place).
+
+```bash
+envm sort .env.production
+envm sort .env.production -o .env.sorted
+```
+
+### `envm list` / `envm ls`
+
+List all `.env*` files in the current directory with variable counts.
+
+```bash
+envm ls
+```
+
+### `envm init`
+
+Initialize envm in the current project. Creates a `.envm/` directory for config, schemas, and snapshots.
+
+```bash
+envm init
+envm init --schema    # also infer a schema from existing env files
+```
+
+### `envm update`
+
+Update envm to the latest version (for shell-script installs).
+
+```bash
+envm update
+```
+
 ## Project Structure
+
+After running `envm init`, your project will have:
 
 ```
 my-project/
