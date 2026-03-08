@@ -13,6 +13,7 @@ import { schemaCommand } from "./schema.js";
 import { snapshotCommand } from "./snapshot.js";
 import { sortCommand } from "./sort.js";
 import { normalizeCommand } from "./normalize.js";
+import { updateCommand } from "./update.js";
 
 const program = new Command();
 
@@ -35,5 +36,6 @@ program.addCommand(schemaCommand);
 program.addCommand(snapshotCommand);
 program.addCommand(sortCommand);
 program.addCommand(normalizeCommand);
+program.addCommand(updateCommand);
 
 program.parse();

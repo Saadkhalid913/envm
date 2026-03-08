@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { readEnvFile, resolveEnvPath } from "../utils/fs.js";
 import { diffEnvMaps, type DiffResult, type SetFilter } from "../core/differ.js";
 import { quoteValue } from "../core/writer.js";
-import { createTable, truncate } from "../utils/format.js";
+import { createTable, truncate, computeColumnWidths } from "../utils/format.js";
 import type { EnvMap } from "../core/parser.js";
 
 export const diffCommand = new Command("diff")
@@ -39,19 +39,30 @@ export const diffCommand = new Command("diff")
   });
 
 function printTable(result: DiffResult): void {
-  const maxValueLen = 20;
-  const headers = ["Key", ...result.files.map((f) => truncate(f, 12)), "Status"];
-  const table = createTable(headers);
+  const { keyWidth, valueWidth, statusWidth, headerWidth } =
+    computeColumnWidths(result.files.length);
+
+  const headers = [
+    "Key",
+    ...result.files.map((f) => truncate(f, headerWidth - 2)),
+    "Status",
+  ];
+  const colWidths = [
+    keyWidth,
+    ...result.files.map(() => valueWidth),
+    statusWidth,
+  ];
+  const table = createTable(headers, colWidths);
 
   for (const entry of result.entries) {
-    const row: string[] = [entry.key];
+    const row: string[] = [truncate(entry.key, keyWidth - 2)];
 
     for (const file of result.files) {
       const val = entry.values[file];
       if (val === undefined) {
         row.push(chalk.dim("—"));
       } else {
-        row.push(truncate(quoteValue(val), maxValueLen));
+        row.push(truncate(quoteValue(val), valueWidth - 2));
       }
     }
 
