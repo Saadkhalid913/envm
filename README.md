@@ -19,13 +19,13 @@ npx envm
 ### Shell script (macOS / Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/saadkhalid/envm/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Saadkhalid913/envm/main/install.sh | bash
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/saadkhalid/envm.git ~/.envm
+git clone https://github.com/Saadkhalid913/envm.git ~/.envm
 cd ~/.envm && npm install && npm run build
 sudo ln -sf ~/.envm/dist/cli/index.js /usr/local/bin/envm
 ```

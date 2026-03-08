@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # envm installer for macOS and Linux
-# Usage: curl -fsSL https://raw.githubusercontent.com/saadkhalid/envm/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/Saadkhalid913/envm/main/install.sh | bash
 
-REPO="https://github.com/saadkhalid/envm.git"
+REPO="https://github.com/Saadkhalid913/envm.git"
 INSTALL_DIR="${ENVM_INSTALL_DIR:-$HOME/.envm}"
 BIN_DIR="${ENVM_BIN_DIR:-/usr/local/bin}"
 MAN_DIR="${ENVM_MAN_DIR:-/usr/local/share/man/man1}"
