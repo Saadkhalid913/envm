@@ -45,7 +45,7 @@ run_with_spinner() {
   local logfile
   logfile=$(mktemp)
 
-  "$@" >"$logfile" 2>&1 &
+  "$@" </dev/null >"$logfile" 2>&1 &
   local cmd_pid=$!
 
   local i=0
