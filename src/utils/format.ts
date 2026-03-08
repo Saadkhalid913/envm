@@ -10,30 +10,41 @@ export function getTerminalWidth(): number {
  *
  * Layout: | Key | file1 | file2 | ... | Status |
  *
- * Key column: 20% of available space (min 10)
- * Status column: fixed based on longest status string (~25)
- * File value columns: split remaining space equally
+ * Strategy: fit the table to exactly the terminal width.
+ * - Status column: compact (just enough for longest status label)
+ * - Key column: proportional but capped
+ * - Value columns: split all remaining space equally
  */
-export function computeColumnWidths(fileCount: number): {
+export function computeColumnWidths(
+  fileCount: number,
+  longestKey: number = 20,
+  longestStatus: number = 15
+): {
   keyWidth: number;
   valueWidth: number;
   statusWidth: number;
-  headerWidth: number;
 } {
   const termWidth = getTerminalWidth();
   const totalColumns = fileCount + 2; // Key + N files + Status
-  // cli-table3 uses 3 chars per border (│ + space padding on each side)
-  const borderOverhead = totalColumns + 1 + totalColumns * 2;
+  // cli-table3: 1 border char per column boundary + 1 padding char each side
+  const borderOverhead = (totalColumns + 1) + (totalColumns * 2);
 
   const available = termWidth - borderOverhead;
 
-  const statusWidth = 25;
-  const keyWidth = Math.max(10, Math.floor(available * 0.18));
+  // Status: just enough for the content + small padding
+  const statusWidth = Math.min(longestStatus + 4, Math.floor(available * 0.25));
+
+  // Key: enough for the longest key, but capped at 25% of available
+  const keyWidth = Math.min(
+    Math.max(longestKey + 2, 12),
+    Math.floor(available * 0.25)
+  );
+
+  // Values: split ALL remaining space equally across file columns
   const remaining = available - keyWidth - statusWidth;
   const valueWidth = Math.max(8, Math.floor(remaining / fileCount));
-  const headerWidth = valueWidth;
 
-  return { keyWidth, valueWidth, statusWidth, headerWidth };
+  return { keyWidth, valueWidth, statusWidth };
 }
 
 export function createTable(

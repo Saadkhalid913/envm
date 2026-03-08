@@ -1,7 +1,7 @@
 import { Command } from "commander";
-import chalk from "chalk";
-import { readEnvFile, resolveEnvPath } from "../utils/fs.js";
-import { diffEnvMaps, type DiffResult, type SetFilter } from "../core/differ.js";
+import chalk, { type ChalkInstance } from "chalk";
+import { readEnvFile, resolveEnvPath, expandEnvGlobs } from "../utils/fs.js";
+import { diffEnvMaps, type DiffResult, type DiffEntry, type SetFilter } from "../core/differ.js";
 import { quoteValue } from "../core/writer.js";
 import { createTable, truncate, computeColumnWidths } from "../utils/format.js";
 import type { EnvMap } from "../core/parser.js";
@@ -9,10 +9,19 @@ import type { EnvMap } from "../core/parser.js";
 export const diffCommand = new Command("diff")
   .alias("compare")
   .description("Compare two or more env files using set operations")
-  .argument("<files...>", "Env files to compare (at least 2)")
+  .argument("<files...>", "Env files to compare (supports globs like .env.*)")
   .option("--only <filter>", "Set operation filter (union, intersection, diff, xor, a, b, ...)", "union")
   .option("--format <type>", "Output format: table or json", "table")
-  .action(async (files: string[], opts) => {
+  .action(async (rawFiles: string[], opts) => {
+    // Expand globs
+    let files: string[];
+    try {
+      files = await expandEnvGlobs(rawFiles);
+    } catch (err) {
+      console.error(chalk.red((err as Error).message));
+      process.exit(1);
+    }
+
     if (files.length < 2) {
       console.error(chalk.red("At least 2 files are required for comparison."));
       process.exit(1);
@@ -38,13 +47,80 @@ export const diffCommand = new Command("diff")
     }
   });
 
+// Muted, distinct colors for value grouping — easy on dark terminals
+const VALUE_GROUP_COLORS: ChalkInstance[] = [
+  chalk.green,
+  chalk.red,
+  chalk.yellow,
+  chalk.blue,
+  chalk.magenta,
+  chalk.cyan,
+];
+
+/**
+ * For a row with "differs" status, group file values by equality
+ * and assign a color to each group. Returns a map from file -> color function.
+ *
+ * If all present values are the same, no coloring is applied.
+ * Missing values (undefined) get chalk.dim.
+ */
+function getValueColors(
+  entry: DiffEntry,
+  files: string[]
+): Map<string, ChalkInstance> {
+  const colorMap = new Map<string, ChalkInstance>();
+
+  if (entry.status !== "differs") {
+    return colorMap;
+  }
+
+  // Group files by their value
+  const groups = new Map<string, string[]>();
+  for (const file of files) {
+    const val = entry.values[file];
+    if (val === undefined) continue;
+    const existing = groups.get(val);
+    if (existing) {
+      existing.push(file);
+    } else {
+      groups.set(val, [file]);
+    }
+  }
+
+  // Only color if there are 2+ distinct values
+  if (groups.size < 2) return colorMap;
+
+  let colorIdx = 0;
+  for (const [, groupFiles] of groups) {
+    const color = VALUE_GROUP_COLORS[colorIdx % VALUE_GROUP_COLORS.length];
+    for (const file of groupFiles) {
+      colorMap.set(file, color);
+    }
+    colorIdx++;
+  }
+
+  return colorMap;
+}
+
 function printTable(result: DiffResult): void {
-  const { keyWidth, valueWidth, statusWidth, headerWidth } =
-    computeColumnWidths(result.files.length);
+  // Compute longest key and status string for sizing
+  let longestKey = 3; // "Key"
+  let longestStatus = 6; // "Status"
+
+  for (const entry of result.entries) {
+    longestKey = Math.max(longestKey, entry.key.length);
+    if (entry.status === "only_in") {
+      const statusStr = `only in ${entry.presentIn.join(", ")}`;
+      longestStatus = Math.max(longestStatus, statusStr.length);
+    }
+  }
+
+  const { keyWidth, valueWidth, statusWidth } =
+    computeColumnWidths(result.files.length, longestKey, longestStatus);
 
   const headers = [
     "Key",
-    ...result.files.map((f) => truncate(f, headerWidth - 2)),
+    ...result.files.map((f) => truncate(f, valueWidth - 2)),
     "Status",
   ];
   const colWidths = [
@@ -56,13 +132,16 @@ function printTable(result: DiffResult): void {
 
   for (const entry of result.entries) {
     const row: string[] = [truncate(entry.key, keyWidth - 2)];
+    const valueColors = getValueColors(entry, result.files);
 
     for (const file of result.files) {
       const val = entry.values[file];
       if (val === undefined) {
         row.push(chalk.dim("—"));
       } else {
-        row.push(truncate(quoteValue(val), valueWidth - 2));
+        const display = truncate(quoteValue(val), valueWidth - 2);
+        const colorFn = valueColors.get(file);
+        row.push(colorFn ? colorFn(display) : display);
       }
     }
 

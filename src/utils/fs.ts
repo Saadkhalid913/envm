@@ -56,3 +56,36 @@ export async function ensureDir(dirPath: string): Promise<void> {
 export function resolveEnvPath(file: string, cwd?: string): string {
   return path.resolve(cwd ?? process.cwd(), file);
 }
+
+/**
+ * Expand glob patterns in env file arguments.
+ * Supports patterns like `.env.*`, `.env.prod.*`, etc.
+ * Non-glob arguments are returned as-is.
+ */
+export async function expandEnvGlobs(
+  patterns: string[],
+  cwd?: string
+): Promise<string[]> {
+  const dir = cwd ?? process.cwd();
+  const result: string[] = [];
+
+  for (const pattern of patterns) {
+    if (pattern.includes("*")) {
+      const allFiles = await discoverEnvFiles(dir);
+      const regex = new RegExp(
+        "^" + pattern.replace(/\./g, "\\.").replace(/\*/g, ".*") + "$"
+      );
+      const matched = allFiles.filter((f) => regex.test(f));
+      if (matched.length === 0) {
+        throw new Error(`No files matched pattern: ${pattern}`);
+      }
+      for (const m of matched) {
+        if (!result.includes(m)) result.push(m);
+      }
+    } else {
+      if (!result.includes(pattern)) result.push(pattern);
+    }
+  }
+
+  return result;
+}
